@@ -14,6 +14,23 @@ try:
 except ImportError:
     st_autorefresh = None
 
+from supabase import create_client
+
+def test_supabase_connection():
+    try:
+        supabase_url = st.secrets["SUPABASE_URL"]
+        supabase_key = st.secrets["SUPABASE_KEY"]
+
+        supabase = create_client(supabase_url, supabase_key)
+        response = supabase.table("categories").select("*").limit(5).execute()
+
+        st.sidebar.success("Supabase подключен ✅")
+        return response.data
+
+    except Exception as error:
+        st.sidebar.error("Supabase не подключен ❌")
+        st.sidebar.exception(error)
+        return []
 
 DB_NAME = "week_planner.db"
 DB_PATH = Path(DB_NAME)
@@ -3484,7 +3501,9 @@ def render_advanced_stats_tab():
 
 
 def main():
+    
     st.set_page_config(page_title="Week Planner Pro", layout="wide")
+    test_supabase_connection()
     create_database()
 
     today_plan = get_day_plan(date.today())
