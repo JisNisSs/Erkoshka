@@ -1,3 +1,4 @@
+import hmac
 from datetime import date, datetime, timedelta
 from io import BytesIO
 
@@ -1368,6 +1369,49 @@ def render_settings_page():
 
 
 # =============================
+# Password protection
+# =============================
+
+def check_password():
+    """
+    Простая защита приложения паролем.
+    Пароль хранится в Streamlit Secrets:
+    APP_PASSWORD = "твой_пароль"
+    """
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+
+    if st.session_state["authenticated"]:
+        return True
+
+    st.markdown("# 🔒 Erkoshka Planner")
+    st.write("Введите пароль, чтобы открыть приложение.")
+
+    password = st.text_input("Пароль", type="password")
+
+    if st.button("Войти", use_container_width=True):
+        try:
+            correct_password = st.secrets["APP_PASSWORD"]
+        except Exception:
+            st.error("APP_PASSWORD не задан в Streamlit Secrets.")
+            st.stop()
+
+        if hmac.compare_digest(password, correct_password):
+            st.session_state["authenticated"] = True
+            st.rerun()
+        else:
+            st.error("Неверный пароль")
+
+    return False
+
+
+def logout_button():
+    if st.sidebar.button("🚪 Выйти", use_container_width=True):
+        st.session_state["authenticated"] = False
+        st.rerun()
+
+
+# =============================
 # Mobile / Desktop mode
 # =============================
 
@@ -1622,6 +1666,9 @@ def render_desktop_app():
 # =============================
 
 def main():
+    if not check_password():
+        return
+
     try:
         today_plan = get_day_plan(date.today())
         apply_theme_css(today_plan["day_type"])
@@ -1633,6 +1680,9 @@ def main():
 
     st.title("📅 Erkoshka Planner")
     st.write("Облачный планировщик: смены, личные задачи, КИПиА журнал и бюджет.")
+
+    logout_button()
+    st.sidebar.divider()
 
     st.sidebar.header("Сегодня")
     st.sidebar.write(f"Дата: **{date.today()}**")
