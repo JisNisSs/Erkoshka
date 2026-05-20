@@ -2349,7 +2349,67 @@ def render_live_fun_mode(day_type):
     mood_index = quote_index % len(mood_emojis)
 
     quote_text, quote_author = quotes[quote_index]
-    quote_of_day = f"{quote_text}<br><span class='erk-live-author'>— {quote_author}</span>"
+
+    quote_translations = {
+        "You have power over your mind, not outside events.": "У тебя есть власть над своим разумом, а не над внешними событиями.",
+        "The happiness of your life depends upon your thoughts.": "Счастье твоей жизни зависит от качества твоих мыслей.",
+        "Waste no more time arguing what a good person should be. Be one.": "Не трать время на споры о том, каким должен быть хороший человек. Будь им.",
+        "The obstacle is the way.": "Препятствие и есть путь.",
+        "If it is not right, do not do it.": "Если это неправильно — не делай этого.",
+        "He who fears death will never do anything worthy of life.": "Тот, кто боится смерти, никогда не сделает ничего достойного жизни.",
+        "Luck is what happens when preparation meets opportunity.": "Удача — это момент, когда подготовка встречается с возможностью.",
+        "Difficulties strengthen the mind.": "Трудности укрепляют разум.",
+        "We suffer more often in imagination than in reality.": "Мы чаще страдаем в воображении, чем в реальности.",
+        "No wind is favorable to one who has no destination.": "Никакой ветер не будет попутным для того, кто не знает, куда плывёт.",
+        "It is not things that disturb us, but our judgments about them.": "Нас тревожат не сами вещи, а наши суждения о них.",
+        "First say to yourself what you would be, then do what you have to do.": "Сначала скажи себе, кем хочешь стать, а затем делай то, что должен.",
+        "No person is free who is not master of himself.": "Никто не свободен, если не владеет собой.",
+        "Do not explain your philosophy. Embody it.": "Не объясняй свою философию — воплощай её в поступках.",
+        "The key is to keep company only with people who uplift you.": "Ключ в том, чтобы быть рядом с людьми, которые помогают тебе расти.",
+        "A journey of a thousand miles begins with a single step.": "Путь в тысячу миль начинается с одного шага.",
+        "Knowing others is wisdom; knowing yourself is enlightenment.": "Знать других — мудрость; знать себя — просветление.",
+        "Mastering others is strength; mastering yourself is true power.": "Побеждать других — сила; владеть собой — настоящая мощь.",
+        "Nature does not hurry, yet everything is accomplished.": "Природа не спешит, но всё успевает.",
+        "The wise person does not hoard.": "Мудрый человек не копит ради накопления.",
+        "It does not matter how slowly you go as long as you do not stop.": "Не важно, как медленно ты идёшь, если ты не останавливаешься.",
+        "Our greatest glory is not in never falling, but in rising every time.": "Наша величайшая слава не в том, чтобы никогда не падать, а в том, чтобы каждый раз подниматься.",
+        "To know what you know and what you do not know, that is knowledge.": "Знать, что ты знаешь, и знать, чего не знаешь, — вот настоящее знание.",
+        "The person who moves a mountain begins by carrying small stones.": "Тот, кто сдвигает гору, начинает с переноса маленьких камней.",
+        "Study the past if you would define the future.": "Изучай прошлое, если хочешь понять будущее.",
+        "Knowing yourself is the beginning of all wisdom.": "Познать себя — начало всякой мудрости.",
+        "We are what we repeatedly do.": "Мы — это то, что мы постоянно делаем.",
+        "Quality is not an act, it is a habit.": "Качество — это не разовый поступок, а привычка.",
+        "The roots of education are bitter, but the fruit is sweet.": "Корни образования горьки, но плоды его сладки.",
+        "Patience is bitter, but its fruit is sweet.": "Терпение горько, но плод его сладок.",
+        "An unexamined life is not worth living.": "Жизнь без осмысления не стоит того, чтобы её проживать.",
+        "I know that I know nothing.": "Я знаю, что ничего не знаю.",
+        "The secret of change is to focus energy on building the new.": "Секрет перемен — направить энергию не на борьбу со старым, а на создание нового.",
+        "Strong minds discuss ideas.": "Сильные умы обсуждают идеи.",
+        "To find yourself, think for yourself.": "Чтобы найти себя, думай самостоятельно.",
+        "What we think, we become.": "Мы становимся тем, о чём думаем.",
+        "Peace comes from within.": "Спокойствие приходит изнутри.",
+        "No one saves us but ourselves.": "Никто не спасёт нас, кроме нас самих.",
+        "The mind is everything.": "Разум — это всё.",
+        "Drop by drop is the water pot filled.": "Кувшин наполняется капля за каплей.",
+        "Genius is one percent inspiration and ninety-nine percent perspiration.": "Гений — это один процент вдохновения и девяносто девять процентов труда.",
+        "I have not failed. I have found ways that do not work.": "Я не потерпел неудачу. Я нашёл способы, которые не работают.",
+        "Opportunity is missed because it is dressed in overalls.": "Возможность часто упускают, потому что она приходит в рабочей одежде.",
+        "There is no substitute for hard work.": "Тяжёлый труд ничем не заменить.",
+        "If we did all we are capable of, we would amaze ourselves.": "Если бы мы делали всё, на что способны, мы бы сами себя удивили.",
+        "Life is like riding a bicycle. To keep balance, you must keep moving.": "Жизнь похожа на езду на велосипеде: чтобы держать равновесие, нужно двигаться.",
+        "Imagination is more important than knowledge.": "Воображение важнее знания.",
+        "In the middle of difficulty lies opportunity.": "В центре трудности скрывается возможность.",
+        "A person who never made a mistake never tried anything new.": "Человек, который никогда не ошибался, никогда не пробовал ничего нового.",
+        "Try not to become successful, but valuable.": "Старайся стать не просто успешным, а ценным человеком.",
+    }
+
+    quote_translation = quote_translations.get(quote_text, "")
+
+    if quote_translation:
+        quote_of_day = f"{quote_text}<br><span class='erk-live-translation'>{quote_translation}</span><br><span class='erk-live-author'>— {quote_author}</span>"
+    else:
+        quote_of_day = f"{quote_text}<br><span class='erk-live-author'>— {quote_author}</span>"
+
     mood_emoji = mood_emojis[mood_index]
 
     if day_type == "Ночная смена":
