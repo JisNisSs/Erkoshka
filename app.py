@@ -1412,6 +1412,287 @@ def logout_button():
 
 
 # =============================
+# Voice input
+# =============================
+
+def render_browser_voice_box():
+    components.html(
+        """
+        <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;">
+            <button id="startBtn" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid #CBD5E1;background:#EEF4FF;font-size:18px;font-weight:700;cursor:pointer;">🎙️ Начать голосовой ввод</button>
+            <textarea id="voiceText" placeholder="Здесь появится распознанный текст..." style="width:100%;min-height:130px;margin-top:12px;padding:12px;border-radius:14px;border:1px solid #CBD5E1;font-size:16px;box-sizing:border-box;"></textarea>
+            <button id="copyBtn" style="width:100%;padding:12px 16px;border-radius:14px;border:1px solid #CBD5E1;background:#F8FAFC;font-size:16px;font-weight:700;margin-top:8px;cursor:pointer;">📋 Скопировать текст</button>
+            <div id="status" style="margin-top:8px;color:#475569;font-size:14px;"></div>
+        </div>
+        <script>
+        const startBtn = document.getElementById("startBtn");
+        const copyBtn = document.getElementById("copyBtn");
+        const voiceText = document.getElementById("voiceText");
+        const statusBox = document.getElementById("status");
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            statusBox.innerText = "Браузерный голосовой ввод не поддерживается. На iPhone нажми микрофон на клавиатуре в поле ниже.";
+            startBtn.disabled = true;
+            startBtn.style.opacity = "0.6";
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.lang = "ru-RU";
+            recognition.interimResults = true;
+            recognition.continuous = false;
+            let finalText = "";
+            startBtn.onclick = () => {
+                finalText = "";
+                voiceText.value = "";
+                statusBox.innerText = "Слушаю... говори.";
+                recognition.start();
+            };
+            recognition.onresult = (event) => {
+                let interimText = "";
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) { finalText += transcript + " "; }
+                    else { interimText += transcript; }
+                }
+                voiceText.value = (finalText + interimText).trim();
+            };
+            recognition.onerror = (event) => { statusBox.innerText = "Ошибка голосового ввода: " + event.error; };
+            recognition.onend = () => { statusBox.innerText = "Готово. Скопируй текст и вставь в поле ниже."; };
+        }
+        copyBtn.onclick = async () => {
+            try {
+                await navigator.clipboard.writeText(voiceText.value);
+                statusBox.innerText = "Текст скопирован. Вставь его в поле ниже.";
+            } catch (e) {
+                voiceText.select();
+                document.execCommand("copy");
+                statusBox.innerText = "Текст скопирован.";
+            }
+        };
+        </script>
+        """,
+        height=270
+    )
+
+
+def clean_voice_text(text):
+    return " ".join(str(text).strip().split())
+
+
+def extract_area(text):
+    for token in clean_voice_text(text).upper().replace("/", " ").split():
+        token = token.strip(".,;:()[]")
+        if "-" in token:
+            left, right = token.split("-", 1)
+            if left.isalpha() and right.isdigit() and 2 <= len(left) <= 4:
+                return token
+    return ""
+
+
+def extract_tag(text):
+    tokens = [token.strip(".,;:()[]").upper() for token in clean_voice_text(text).replace("/", " ").split()]
+    for token in tokens:
+        parts = token.split("-")
+        if len(parts) >= 3 and parts[0].isdigit() and parts[1].isalpha() and parts[2].isdigit():
+            return token
+    for token in tokens:
+        if "-" in token:
+            parts = token.split("-")
+            if len(parts) == 2 and parts[0].isalpha() and parts[1].isdigit() and len(parts[0]) >= 2:
+                return token
+    return ""
+
+
+def detect_work_type(text):
+    lower = clean_voice_text(text).lower()
+    checks = [
+        ("монтаж", "Монтаж"),
+        ("демонтаж", "Демонтаж"),
+        ("калибр", "Калибровка"),
+        ("питани", "Проверка питания"),
+        ("кабель", "Проверка кабеля"),
+        ("сигнал", "Проверка сигнала"),
+        ("замен", "Замена датчика"),
+        ("настро", "Настройка прибора"),
+        ("чист", "Чистка датчика"),
+        ("осмотр", "Осмотр"),
+        ("авар", "Аварийная работа"),
+        ("заяв", "Заявка"),
+        ("вызов", "Вызов")
+    ]
+    for key, value in checks:
+        if key in lower:
+            return value
+    return "Вызов"
+
+
+def detect_work_status(text):
+    lower = clean_voice_text(text).lower()
+    if "механ" in lower and ("жд" in lower or "перед" in lower):
+        return "Ждём механиков"
+    if "элект" in lower and ("жд" in lower or "перед" in lower):
+        return "Ждём электриков"
+    if "запчаст" in lower or "зип" in lower:
+        return "Ждём запчасть"
+    if "следующ" in lower or "передал" in lower or "передано" in lower:
+        return "Передано следующей смене"
+    if "в работе" in lower:
+        return "В работе"
+    if "откры" in lower:
+        return "Открыто"
+    if "не подтверд" in lower:
+        return "Неисправность не подтвердилась"
+    if "норм" in lower or "работает" in lower or "восстанов" in lower or "заверш" in lower or "готов" in lower:
+        return "Завершено"
+    return "Завершено"
+
+
+def split_problem_and_action(text):
+    source = clean_voice_text(text)
+    lower = source.lower()
+    action_words = ["проверил", "проверили", "заменил", "заменили", "почистил", "почистили", "настроил", "настроили", "сделал", "сделали", "выполнил", "выполнили", "устранил", "устранили"]
+    positions = []
+    for word in action_words:
+        pos = lower.find(word)
+        if pos >= 0:
+            positions.append(pos)
+    if not positions:
+        return source, ""
+    pos = min(positions)
+    return source[:pos].strip(" ,.;"), source[pos:].strip(" ,.;")
+
+
+def parse_amount_from_voice(text):
+    digits = ""
+    last_number = ""
+    for char in str(text):
+        if char.isdigit():
+            digits += char
+        else:
+            if digits:
+                last_number = digits
+                digits = ""
+    if digits:
+        last_number = digits
+    if not last_number:
+        return 0.0
+    try:
+        return float(last_number)
+    except Exception:
+        return 0.0
+
+
+def render_voice_assistant_page():
+    st.header("🎙️ Голосовой ввод")
+    st.write("Скажи фразу, скопируй распознанный текст и вставь ниже. На iPhone можно нажать микрофон на клавиатуре прямо в поле ввода.")
+
+    render_browser_voice_box()
+    st.divider()
+
+    voice_mode = st.selectbox("Куда сохранить голосовую запись", ["🛠️ Рабочий журнал", "➕ Личная задача", "💰 Расход / доход"])
+    voice_text = st.text_area("Вставь сюда распознанный текст", placeholder="Например: FL-111 3445-LIT-0051 нестабильный сигнал проверил питание почистил датчик сигнал восстановился", height=130)
+    clean_text = clean_voice_text(voice_text)
+
+    if not clean_text:
+        st.info("Сначала продиктуй или вставь текст.")
+        return
+
+    if voice_mode == "🛠️ Рабочий журнал":
+        work_date = st.date_input("Дата", value=date.today(), key="voice_work_date")
+        day_plan = get_day_plan(work_date)
+        default_shift = "Ночь" if day_plan["day_type"] == "Ночная смена" else "День" if day_plan["day_type"] == "Дневная смена" else "Другое"
+        shift_options = ["День", "Ночь", "Другое"]
+        shift_index = shift_options.index(default_shift) if default_shift in shift_options else 0
+
+        parsed_problem, parsed_action = split_problem_and_action(clean_text)
+        parsed_type = detect_work_type(clean_text)
+        parsed_status = detect_work_status(clean_text)
+
+        st.subheader("Проверь поля перед сохранением")
+        shift_type = st.selectbox("Смена", shift_options, index=shift_index, key="voice_shift")
+        area = st.text_input("Участок", value=extract_area(clean_text), key="voice_area")
+        tag = st.text_input("TAG", value=extract_tag(clean_text), key="voice_tag")
+        work_type = st.selectbox("Тип работы", WORK_TYPES, index=WORK_TYPES.index(parsed_type) if parsed_type in WORK_TYPES else 0, key="voice_work_type")
+        problem = st.text_area("Проблема", value=parsed_problem, key="voice_problem")
+        action_taken = st.text_area("Что сделал", value=parsed_action, key="voice_action")
+        result = st.text_area("Результат", value="", key="voice_result")
+        status = st.selectbox("Статус", WORK_STATUSES, index=WORK_STATUSES.index(parsed_status) if parsed_status in WORK_STATUSES else 2, key="voice_status")
+
+        if st.button("Сохранить в рабочий журнал", use_container_width=True):
+            supabase_insert("work_logs", {
+                "work_date": str(work_date),
+                "shift_type": shift_type,
+                "area": area.strip(),
+                "equipment": "",
+                "tag": tag.strip(),
+                "work_type": work_type,
+                "request_number": "",
+                "problem": problem.strip(),
+                "action_taken": action_taken.strip(),
+                "result": result.strip(),
+                "status": status,
+                "handover_to": "",
+                "comment": clean_text,
+                "created_at": now_text()
+            })
+            st.success("Голосовая запись сохранена в рабочий журнал")
+            st.rerun()
+
+    elif voice_mode == "➕ Личная задача":
+        task_date = st.date_input("Дата", value=date.today(), key="voice_task_date")
+        task_time = st.time_input("Время", value=get_default_time(), key="voice_task_time")
+        duration = st.number_input("Минут", min_value=5, max_value=300, value=30, step=5, key="voice_task_duration")
+        category = st.selectbox("Категория", load_categories(), key="voice_task_category")
+        priority = st.selectbox("Приоритет", TASK_PRIORITIES, index=1, key="voice_task_priority")
+        title = st.text_input("Название задачи", value=clean_text, key="voice_task_title")
+
+        if st.button("Сохранить задачу", use_container_width=True):
+            conflict = find_time_conflict(str(task_date), task_time.strftime("%H:%M"), int(duration))
+            if conflict is not None:
+                conflict_end = get_end_time(conflict["Дата"], conflict["Время"], conflict["Длительность_мин"])
+                st.error(f"На это время уже есть: {conflict['Время']} - {conflict_end} | {conflict['Задача']}")
+            else:
+                supabase_insert("tasks", {
+                    "task_date": str(task_date),
+                    "start_time": task_time.strftime("%H:%M"),
+                    "duration_minutes": int(duration),
+                    "title": title.strip(),
+                    "category": category,
+                    "status": "Запланировано",
+                    "priority": priority,
+                    "weight": 1,
+                    "skip_reason": "",
+                    "comment": "Голосовой ввод",
+                    "created_at": now_text()
+                })
+                st.success("Задача сохранена")
+                st.rerun()
+
+    elif voice_mode == "💰 Расход / доход":
+        tx_date = st.date_input("Дата", value=date.today(), key="voice_tx_date")
+        tx_type = st.selectbox("Тип", ["Расход", "Доход"], key="voice_tx_type")
+        category = st.selectbox("Категория", load_budget_categories(tx_type), key="voice_tx_category")
+        amount = st.number_input("Сумма, ₸", min_value=0.0, value=parse_amount_from_voice(clean_text), step=1000.0, key="voice_tx_amount")
+        payment_method = st.selectbox("Оплата", PAYMENT_METHODS, key="voice_tx_payment")
+        comment = st.text_input("Комментарий", value=clean_text, key="voice_tx_comment")
+
+        if st.button("Сохранить операцию", use_container_width=True):
+            if amount <= 0:
+                st.warning("Сумма должна быть больше 0")
+            else:
+                supabase_insert("budget_transactions", {
+                    "tx_date": str(tx_date),
+                    "tx_type": tx_type,
+                    "category": category,
+                    "amount": float(amount),
+                    "payment_method": payment_method,
+                    "comment": comment.strip(),
+                    "created_at": now_text()
+                })
+                st.success("Операция сохранена")
+                st.rerun()
+
+
+# =============================
 # Mobile / Desktop mode
 # =============================
 
@@ -1595,6 +1876,7 @@ def render_mobile_app():
 
     mobile_pages = [
         "🏠 Сегодня",
+        "🎙️ Голосовой ввод",
         "➕ Личная задача",
         "🛠️ Рабочий вызов",
         "💰 Расход / доход",
@@ -1606,6 +1888,8 @@ def render_mobile_app():
 
     if selected_mobile_page == "🏠 Сегодня":
         render_dashboard_page()
+    elif selected_mobile_page == "🎙️ Голосовой ввод":
+        render_voice_assistant_page()
     elif selected_mobile_page == "➕ Личная задача":
         render_mobile_quick_task()
     elif selected_mobile_page == "🛠️ Рабочий вызов":
