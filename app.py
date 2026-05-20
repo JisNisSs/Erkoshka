@@ -4,6 +4,7 @@ from io import BytesIO
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import streamlit.components.v1 as components
 from supabase import create_client
 
 
@@ -1367,28 +1368,213 @@ def render_settings_page():
 
 
 # =============================
-# Main
+# Mobile / Desktop mode
 # =============================
 
-def main():
-    try:
-        today_plan = get_day_plan(date.today())
-        apply_theme_css(today_plan["day_type"])
-        st.sidebar.success("Supabase подключен ✅")
-    except Exception as error:
-        st.error("Ошибка подключения к Supabase")
-        st.exception(error)
-        return
+def detect_device_mode():
+    """
+    Автоопределение телефона через ширину экрана.
+    Streamlit сам напрямую не даёт user-agent, поэтому используем маленький JS.
+    Если автоопределение не успело сработать, по умолчанию будет desktop.
+    """
+    device_param = st.query_params.get("device", None)
 
-    st.title("📅 Erkoshka Planner")
-    st.write("Облачный планировщик: смены, личные задачи, КИПиА журнал и бюджет.")
+    if isinstance(device_param, list):
+        device_param = device_param[0] if device_param else None
 
-    st.sidebar.header("Сегодня")
-    st.sidebar.write(f"Дата: **{date.today()}**")
-    st.sidebar.write(f"Тип дня: **{today_plan['day_type']}**")
-    st.sidebar.write(f"Тема: {today_plan['theme']}")
+    if device_param in ["mobile", "desktop"]:
+        return device_param
 
-    st.sidebar.divider()
+    components.html(
+        """
+        <script>
+        const width = window.parent.innerWidth || window.innerWidth;
+        const device = width <= 768 ? "mobile" : "desktop";
+        const url = new URL(window.parent.location.href);
+        if (!url.searchParams.get("device")) {
+            url.searchParams.set("device", device);
+            window.parent.location.replace(url.toString());
+        }
+        </script>
+        """,
+        height=0
+    )
+
+    return "desktop"
+
+
+def render_mobile_quick_task():
+    st.header("➕ Быстрая личная задача")
+
+    categories = load_categories()
+
+    task_date = st.date_input("Дата", value=date.today(), key="mobile_task_date")
+    day_plan = get_day_plan(task_date)
+    st.info(f"{day_plan['day_type']} | {day_plan['theme']}")
+
+    title = st.text_input("Задача", placeholder="Например: Английский 15 минут", key="mobile_task_title")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        task_time = st.time_input("Время", value=get_default_time(), key="mobile_task_time")
+    with col2:
+        duration = st.number_input("Минут", min_value=5, max_value=300, value=30, step=5, key="mobile_task_duration")
+
+    category = st.selectbox("Категория", categories, key="mobile_task_category")
+    priority = st.selectbox("Приоритет", TASK_PRIORITIES, index=1, key="mobile_task_priority")
+
+    if st.button("Сохранить задачу", use_container_width=True):
+        if not title.strip():
+            st.warning("Напиши задачу")
+        else:
+            conflict = find_time_conflict(str(task_date), task_time.strftime("%H:%M"), int(duration))
+            if conflict is not None:
+                conflict_end = get_end_time(conflict["Дата"], conflict["Время"], conflict["Длительность_мин"])
+                st.error(f"На это время уже есть: {conflict['Время']} - {conflict_end} | {conflict['Задача']}")
+            else:
+                supabase_insert("tasks", {
+                    "task_date": str(task_date),
+                    "start_time": task_time.strftime("%H:%M"),
+                    "duration_minutes": int(duration),
+                    "title": title.strip(),
+                    "category": category,
+                    "status": "Запланировано",
+                    "priority": priority,
+                    "weight": 1,
+                    "skip_reason": "",
+                    "comment": "",
+                    "created_at": now_text()
+                })
+                st.success("Задача сохранена")
+                st.rerun()
+
+
+def render_mobile_quick_work():
+    st.header("🛠️ Быстрый рабочий вызов")
+
+    work_date = st.date_input("Дата", value=date.today(), key="mobile_work_date")
+    day_plan = get_day_plan(work_date)
+
+    default_shift = "Ночь" if day_plan["day_type"] == "Ночная смена" else "День" if day_plan["day_type"] == "Дневная смена" else "Другое"
+    shift_options = ["День", "Ночь", "Другое"]
+    shift_index = shift_options.index(default_shift) if default_shift in shift_options else 0
+
+    st.info(f"{day_plan['day_type']} | {day_plan['theme']}")
+
+    shift_type = st.selectbox("Смена", shift_options, index=shift_index, key="mobile_work_shift")
+    area = st.text_input("Участок", placeholder="FL-111", key="mobile_work_area")
+    tag = st.text_input("TAG", placeholder="3445-LIT-0051", key="mobile_work_tag")
+    problem = st.text_area("Проблема", placeholder="Что случилось?", key="mobile_work_problem")
+    action_taken = st.text_area("Что сделал", placeholder="Кратко что проверил/сделал", key="mobile_work_action")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        work_type = st.selectbox("Тип", WORK_TYPES, key="mobile_work_type")
+    with col2:
+        status = st.selectbox("Статус", WORK_STATUSES, index=2, key="mobile_work_status")
+
+    if st.button("Сохранить рабочую запись", use_container_width=True):
+        if not area.strip() and not tag.strip() and not problem.strip():
+            st.warning("Заполни участок, TAG или проблему")
+        else:
+            supabase_insert("work_logs", {
+                "work_date": str(work_date),
+                "shift_type": shift_type,
+                "area": area.strip(),
+                "equipment": "",
+                "tag": tag.strip(),
+                "work_type": work_type,
+                "request_number": "",
+                "problem": problem.strip(),
+                "action_taken": action_taken.strip(),
+                "result": "",
+                "status": status,
+                "handover_to": "",
+                "comment": "",
+                "created_at": now_text()
+            })
+            st.success("Рабочая запись сохранена")
+            st.rerun()
+
+
+def render_mobile_quick_expense():
+    st.header("💰 Быстрый расход / доход")
+
+    tx_date = st.date_input("Дата", value=date.today(), key="mobile_tx_date")
+    tx_type = st.selectbox("Тип", ["Расход", "Доход"], key="mobile_tx_type")
+    categories = load_budget_categories(tx_type)
+
+    category = st.selectbox("Категория", categories, key="mobile_tx_category")
+    amount = st.number_input("Сумма, ₸", min_value=0.0, value=0.0, step=1000.0, key="mobile_tx_amount")
+    payment_method = st.selectbox("Оплата", PAYMENT_METHODS, key="mobile_tx_payment")
+    comment = st.text_input("Комментарий", key="mobile_tx_comment")
+
+    if st.button("Сохранить операцию", use_container_width=True):
+        if amount <= 0:
+            st.warning("Сумма должна быть больше 0")
+        else:
+            supabase_insert("budget_transactions", {
+                "tx_date": str(tx_date),
+                "tx_type": tx_type,
+                "category": category,
+                "amount": float(amount),
+                "payment_method": payment_method,
+                "comment": comment.strip(),
+                "created_at": now_text()
+            })
+            st.success("Операция сохранена")
+            st.rerun()
+
+
+def render_mobile_day_plan():
+    st.header("📆 Тип дня")
+
+    plan_date = st.date_input("Дата", value=date.today(), key="mobile_plan_date")
+    day_type = st.selectbox("Тип дня", DAY_TYPES, key="mobile_plan_type")
+    theme = st.text_input("Тема", value=DAY_THEME_PRESETS.get(day_type, ""), key="mobile_plan_theme")
+
+    if st.button("Сохранить тип дня", use_container_width=True):
+        client = get_supabase_client()
+        client.table("year_plan").upsert({
+            "plan_date": str(plan_date),
+            "day_type": day_type,
+            "theme": theme,
+            "comment": "",
+            "created_at": now_text()
+        }, on_conflict="plan_date").execute()
+        st.success("Тип дня сохранён")
+        st.rerun()
+
+
+def render_mobile_app():
+    st.sidebar.header("📱 Мобильное меню")
+
+    mobile_pages = [
+        "🏠 Сегодня",
+        "➕ Личная задача",
+        "🛠️ Рабочий вызов",
+        "💰 Расход / доход",
+        "📋 Отчёт смены",
+        "📆 Тип дня"
+    ]
+
+    selected_mobile_page = st.sidebar.selectbox("Раздел", mobile_pages)
+
+    if selected_mobile_page == "🏠 Сегодня":
+        render_dashboard_page()
+    elif selected_mobile_page == "➕ Личная задача":
+        render_mobile_quick_task()
+    elif selected_mobile_page == "🛠️ Рабочий вызов":
+        render_mobile_quick_work()
+    elif selected_mobile_page == "💰 Расход / доход":
+        render_mobile_quick_expense()
+    elif selected_mobile_page == "📋 Отчёт смены":
+        render_shift_report_page()
+    elif selected_mobile_page == "📆 Тип дня":
+        render_mobile_day_plan()
+
+
+def render_desktop_app():
     st.sidebar.header("📌 Меню")
 
     menu_items = [
@@ -1429,6 +1615,49 @@ def main():
         render_stats_page()
     elif selected_page == "⚙️ Настройки":
         render_settings_page()
+
+
+# =============================
+# Main
+# =============================
+
+def main():
+    try:
+        today_plan = get_day_plan(date.today())
+        apply_theme_css(today_plan["day_type"])
+        st.sidebar.success("Supabase подключен ✅")
+    except Exception as error:
+        st.error("Ошибка подключения к Supabase")
+        st.exception(error)
+        return
+
+    st.title("📅 Erkoshka Planner")
+    st.write("Облачный планировщик: смены, личные задачи, КИПиА журнал и бюджет.")
+
+    st.sidebar.header("Сегодня")
+    st.sidebar.write(f"Дата: **{date.today()}**")
+    st.sidebar.write(f"Тип дня: **{today_plan['day_type']}**")
+    st.sidebar.write(f"Тема: {today_plan['theme']}")
+
+    st.sidebar.divider()
+
+    detected_mode = detect_device_mode()
+    default_index = 0 if detected_mode == "mobile" else 1
+
+    interface_mode = st.sidebar.radio(
+        "Режим интерфейса",
+        ["📱 Телефон", "💻 Компьютер"],
+        index=default_index
+    )
+
+    st.sidebar.caption(
+        "Автоопределение: телефон" if detected_mode == "mobile" else "Автоопределение: компьютер"
+    )
+
+    if interface_mode == "📱 Телефон":
+        render_mobile_app()
+    else:
+        render_desktop_app()
 
 
 if __name__ == "__main__":
