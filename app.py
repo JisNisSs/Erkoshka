@@ -321,6 +321,40 @@ def apply_theme_css(day_type):
             background: rgba(255, 255, 255, 0.82);
             border-radius: 16px;
         }}
+        @keyframes fadeUp {{
+            from {{
+                opacity: 0;
+                transform: translateY(12px);
+            }}
+            to {{
+                opacity: 1;
+                transform: translateY(0);
+            }}
+        }}
+
+        @keyframes slideInLeft {{
+            from {{
+                opacity: 0;
+                transform: translateX(-10px);
+            }}
+            to {{
+                opacity: 1;
+                transform: translateX(0);
+            }}
+        }}
+
+        @keyframes softGlow {{
+            0% {{
+                box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+            }}
+            50% {{
+                box-shadow: 0 14px 34px rgba(15, 23, 42, 0.11);
+            }}
+            100% {{
+                box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+            }}
+        }}
+
         .custom-card {{
             background: rgba(255, 255, 255, 0.88);
             border: 1px solid {border};
@@ -328,7 +362,43 @@ def apply_theme_css(day_type):
             padding: 24px;
             box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
             margin-bottom: 18px;
+            animation: fadeUp 0.45s ease-out, softGlow 4s ease-in-out infinite;
         }}
+
+        div[data-testid="stMetric"] {{
+            animation: fadeUp 0.42s ease-out;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }}
+
+        div[data-testid="stMetric"]:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.10);
+        }}
+
+        .stButton > button {{
+            transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+        }}
+
+        .stButton > button:hover {{
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.10);
+        }}
+
+        section[data-testid="stSidebar"] {{
+            animation: slideInLeft 0.35s ease-out;
+        }}
+
+        div[data-testid="stAlert"] {{
+            animation: fadeUp 0.35s ease-out;
+        }}
+
+        @media (prefers-reduced-motion: reduce) {{
+            * {{
+                animation: none !important;
+                transition: none !important;
+            }}
+        }}
+
         .accent-text {{
             color: {accent};
             font-weight: 800;
