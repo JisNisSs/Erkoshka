@@ -1419,58 +1419,198 @@ def render_browser_voice_box():
     components.html(
         """
         <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;">
-            <button id="startBtn" style="width:100%;padding:14px 16px;border-radius:14px;border:1px solid #CBD5E1;background:#EEF4FF;font-size:18px;font-weight:700;cursor:pointer;">🎙️ Начать голосовой ввод</button>
-            <textarea id="voiceText" placeholder="Здесь появится распознанный текст..." style="width:100%;min-height:130px;margin-top:12px;padding:12px;border-radius:14px;border:1px solid #CBD5E1;font-size:16px;box-sizing:border-box;"></textarea>
-            <button id="copyBtn" style="width:100%;padding:12px 16px;border-radius:14px;border:1px solid #CBD5E1;background:#F8FAFC;font-size:16px;font-weight:700;margin-top:8px;cursor:pointer;">📋 Скопировать текст</button>
-            <div id="status" style="margin-top:8px;color:#475569;font-size:14px;"></div>
+            <div style="
+                background:#F8FAFC;
+                border:1px solid #CBD5E1;
+                border-radius:16px;
+                padding:12px;
+                margin-bottom:12px;
+                color:#334155;
+                font-size:15px;
+                line-height:1.45;
+            ">
+                <b>Как пользоваться:</b><br>
+                1) Нажми <b>Старт</b> и говори.<br>
+                2) Нажми <b>Стоп</b>, когда закончил.<br>
+                3) Нажми <b>Скопировать</b> и вставь текст в поле ниже.<br>
+                <span style="color:#64748B;">На iPhone можно проще: нажми микрофон на клавиатуре прямо в поле ввода ниже.</span>
+            </div>
+
+            <div id="statusBox" style="
+                padding:12px;
+                border-radius:14px;
+                background:#EEF4FF;
+                border:1px solid #C7D2FE;
+                color:#1E293B;
+                font-weight:700;
+                margin-bottom:10px;
+                text-align:center;
+            ">Готов к записи</div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                <button id="startBtn" style="
+                    padding:14px 16px;
+                    border-radius:14px;
+                    border:1px solid #86EFAC;
+                    background:#DCFCE7;
+                    font-size:17px;
+                    font-weight:800;
+                    cursor:pointer;
+                ">▶️ Старт</button>
+
+                <button id="stopBtn" style="
+                    padding:14px 16px;
+                    border-radius:14px;
+                    border:1px solid #FCA5A5;
+                    background:#FEE2E2;
+                    font-size:17px;
+                    font-weight:800;
+                    cursor:pointer;
+                ">⏹️ Стоп</button>
+            </div>
+
+            <textarea id="voiceText" placeholder="После записи здесь появится текст..." style="
+                width:100%;
+                min-height:150px;
+                margin-top:8px;
+                padding:12px;
+                border-radius:14px;
+                border:1px solid #CBD5E1;
+                font-size:16px;
+                box-sizing:border-box;
+            "></textarea>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+                <button id="copyBtn" style="
+                    padding:12px 16px;
+                    border-radius:14px;
+                    border:1px solid #93C5FD;
+                    background:#DBEAFE;
+                    font-size:16px;
+                    font-weight:800;
+                    cursor:pointer;
+                ">📋 Скопировать</button>
+
+                <button id="clearBtn" style="
+                    padding:12px 16px;
+                    border-radius:14px;
+                    border:1px solid #CBD5E1;
+                    background:#F1F5F9;
+                    font-size:16px;
+                    font-weight:800;
+                    cursor:pointer;
+                ">🧹 Очистить</button>
+            </div>
+
+            <div id="hint" style="margin-top:8px;color:#64748B;font-size:14px;text-align:center;"></div>
         </div>
+
         <script>
         const startBtn = document.getElementById("startBtn");
+        const stopBtn = document.getElementById("stopBtn");
         const copyBtn = document.getElementById("copyBtn");
+        const clearBtn = document.getElementById("clearBtn");
         const voiceText = document.getElementById("voiceText");
-        const statusBox = document.getElementById("status");
+        const statusBox = document.getElementById("statusBox");
+        const hint = document.getElementById("hint");
+
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        let finalText = "";
+        let isListening = false;
+
+        function setStatus(text, bg, border) {
+            statusBox.innerText = text;
+            statusBox.style.background = bg;
+            statusBox.style.borderColor = border;
+        }
+
         if (!SpeechRecognition) {
-            statusBox.innerText = "Браузерный голосовой ввод не поддерживается. На iPhone нажми микрофон на клавиатуре в поле ниже.";
+            setStatus("Голосовой ввод браузером не поддерживается", "#FEF3C7", "#FCD34D");
+            hint.innerText = "Используй микрофон на клавиатуре iPhone в поле ниже.";
             startBtn.disabled = true;
-            startBtn.style.opacity = "0.6";
+            stopBtn.disabled = true;
+            startBtn.style.opacity = "0.55";
+            stopBtn.style.opacity = "0.55";
         } else {
-            const recognition = new SpeechRecognition();
+            recognition = new SpeechRecognition();
             recognition.lang = "ru-RU";
             recognition.interimResults = true;
-            recognition.continuous = false;
-            let finalText = "";
-            startBtn.onclick = () => {
-                finalText = "";
-                voiceText.value = "";
-                statusBox.innerText = "Слушаю... говори.";
-                recognition.start();
+            recognition.continuous = true;
+
+            recognition.onstart = () => {
+                isListening = true;
+                setStatus("🎙️ Слушаю... говори", "#DCFCE7", "#86EFAC");
+                hint.innerText = "Когда закончишь, нажми Стоп.";
             };
+
             recognition.onresult = (event) => {
                 let interimText = "";
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) { finalText += transcript + " "; }
-                    else { interimText += transcript; }
+                    if (event.results[i].isFinal) {
+                        finalText += transcript + " ";
+                    } else {
+                        interimText += transcript;
+                    }
                 }
                 voiceText.value = (finalText + interimText).trim();
             };
-            recognition.onerror = (event) => { statusBox.innerText = "Ошибка голосового ввода: " + event.error; };
-            recognition.onend = () => { statusBox.innerText = "Готово. Скопируй текст и вставь в поле ниже."; };
+
+            recognition.onerror = (event) => {
+                isListening = false;
+                setStatus("Ошибка: " + event.error, "#FEE2E2", "#FCA5A5");
+                hint.innerText = "Попробуй ещё раз или используй микрофон на клавиатуре телефона.";
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                setStatus("⏹️ Запись остановлена", "#E0F2FE", "#7DD3FC");
+                hint.innerText = "Теперь нажми Скопировать и вставь текст в поле ниже.";
+            };
         }
+
+        startBtn.onclick = () => {
+            if (!recognition) return;
+            if (isListening) return;
+            finalText = voiceText.value ? voiceText.value + " " : "";
+            try {
+                recognition.start();
+            } catch (e) {
+                setStatus("Уже записывает", "#DCFCE7", "#86EFAC");
+            }
+        };
+
+        stopBtn.onclick = () => {
+            if (!recognition) return;
+            if (isListening) {
+                recognition.stop();
+            } else {
+                setStatus("Запись уже остановлена", "#E0F2FE", "#7DD3FC");
+            }
+        };
+
         copyBtn.onclick = async () => {
             try {
                 await navigator.clipboard.writeText(voiceText.value);
-                statusBox.innerText = "Текст скопирован. Вставь его в поле ниже.";
+                setStatus("✅ Текст скопирован", "#DCFCE7", "#86EFAC");
+                hint.innerText = "Вставь его в поле ниже.";
             } catch (e) {
                 voiceText.select();
                 document.execCommand("copy");
-                statusBox.innerText = "Текст скопирован.";
+                setStatus("✅ Текст скопирован", "#DCFCE7", "#86EFAC");
             }
+        };
+
+        clearBtn.onclick = () => {
+            finalText = "";
+            voiceText.value = "";
+            setStatus("Готов к новой записи", "#EEF4FF", "#C7D2FE");
+            hint.innerText = "Нажми Старт, чтобы начать заново.";
         };
         </script>
         """,
-        height=270
+        height=440
     )
 
 
