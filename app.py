@@ -1,4 +1,5 @@
 import hmac
+import random
 from datetime import date, datetime, timedelta
 from io import BytesIO
 
@@ -7,6 +8,11 @@ import plotly.express as px
 import streamlit as st
 import streamlit.components.v1 as components
 from supabase import create_client
+
+try:
+    from streamlit_autorefresh import st_autorefresh
+except ImportError:
+    st_autorefresh = None
 
 
 # =============================
@@ -2210,33 +2216,167 @@ def render_desktop_app():
 def render_live_fun_mode(day_type):
     """
     Видимая живая анимация прямо на странице.
-    Не через components iframe, а через st.markdown, чтобы было видно на телефоне и ПК.
+    Плюс цитата дня и смайлик настроения в карточке Erkoshka Live.
     """
+    quotes = [
+        ("Ақырын жүріп, анық бас.", "Абай Құнанбайұлы"),
+        ("Еңбек етсең ерінбей, тояды қарның тіленбей.", "Абай Құнанбайұлы"),
+        ("Пайда ойлама, ар ойла.", "Абай Құнанбайұлы"),
+        ("Болмасаң да ұқсап бақ.", "Абай Құнанбайұлы"),
+        ("Ғылым таппай мақтанба.", "Абай Құнанбайұлы"),
+        ("Сен де бір кірпіш дүниеге, кетігін тап та бар қалан.", "Абай Құнанбайұлы"),
+        ("Адам болам десеңіз, оған қайғы жесеңіз.", "Абай Құнанбайұлы"),
+        ("Талап, еңбек, терең ой — адамның асыл ісі.", "Абай Құнанбайұлы"),
+        ("Ақыл, қайрат, жүректі бірдей ұста.", "Абай Құнанбайұлы"),
+        ("Жүректе қайрат болмаса, ұйықтаған ойды кім түртпек?", "Абай Құнанбайұлы"),
+        ("Тәрбиесіз берілген білім — адамзаттың қас жауы.", "Әл-Фараби"),
+        ("Білімді болу — белгісіз нәрсені аша білу.", "Әл-Фараби"),
+        ("Қайырымды адам — қоғамның тірегі.", "Әл-Фараби"),
+        ("Ақыл мен мінез қосылса, адам толық болады.", "Әл-Фараби"),
+        ("Бақытқа жеткізетін жол — ізгілік пен білім.", "Әл-Фараби"),
+        ("Адал еңбек, ақ жүрек, таза ақыл — адамға керек үш қасиет.", "Шәкәрім Құдайбердіұлы"),
+        ("Ар ілімі — адамдықтың негізі.", "Шәкәрім Құдайбердіұлы"),
+        ("Ұждан жоғалса, адамдық та әлсірейді.", "Шәкәрім Құдайбердіұлы"),
+        ("Таза ақыл адамды тура жолға бастайды.", "Шәкәрім Құдайбердіұлы"),
+        ("Еңбек пен ақыл біріксе, жол ашылады.", "Шәкәрім Құдайбердіұлы"),
+        ("Кел, балалар, оқылық.", "Ыбырай Алтынсарин"),
+        ("Оқысаңыз, балалар, шамнан шырақ жағылар.", "Ыбырай Алтынсарин"),
+        ("Білім — өмірге жарық түсіретін шам.", "Ыбырай Алтынсарин"),
+        ("Өнер-білім бар жұрттар алға қарай барады.", "Ыбырай Алтынсарин"),
+        ("Еңбекпен табылған нан тәтті.", "Ыбырай Алтынсарин"),
+        ("Ел бүгіншіл, менікі ертең үшін.", "Ахмет Байтұрсынұлы"),
+        ("Білімді болуға оқу керек.", "Ахмет Байтұрсынұлы"),
+        ("Ұлттың сақталуына тіл керек.", "Ахмет Байтұрсынұлы"),
+        ("Оқусыз халық қанша бай болса да, біраз жылда кедей болады.", "Ахмет Байтұрсынұлы"),
+        ("Тіл — адамның адамдық белгісінің зоры.", "Ахмет Байтұрсынұлы"),
+        ("Оян, қазақ!", "Міржақып Дулатов"),
+        ("Елдің ертеңі білімді ұрпақтың қолында.", "Міржақып Дулатов"),
+        ("Ұлтқа қызмет ету білімнен басталады.", "Міржақып Дулатов"),
+        ("Жастардың міндеті — елге пайда келтіру.", "Міржақып Дулатов"),
+        ("Ой оянса, ел оянады.", "Міржақып Дулатов"),
+        ("Мен жастарға сенемін.", "Мағжан Жұмабаев"),
+        ("Жас қырандар — елдің ертеңгі күші.", "Мағжан Жұмабаев"),
+        ("Жүректе от болмаса, істе қуат болмайды.", "Мағжан Жұмабаев"),
+        ("Рухы биік елдің жолы ұзақ.", "Мағжан Жұмабаев"),
+        ("Арман адамды алға жетелейді.", "Мағжан Жұмабаев"),
+        ("Білім — халықтың болашағы.", "Жүсіпбек Аймауытов"),
+        ("Тәрбие мен білім қатар жүрсе, адам түзеледі.", "Жүсіпбек Аймауытов"),
+        ("Өзін таныған адам елін де таниды.", "Жүсіпбек Аймауытов"),
+        ("Жақсы мұғалім — жақсы қоғамның бастауы.", "Жүсіпбек Аймауытов"),
+        ("Еңбекке үйренген адам өмірден өз орнын табады.", "Жүсіпбек Аймауытов"),
+        ("Қараңғы қазақ көгіне өрмелеп шығып күн болам.", "Сұлтанмахмұт Торайғыров"),
+        ("Білімсіз елдің күні қараң.", "Сұлтанмахмұт Торайғыров"),
+        ("Жастардың күші — халықтың үміті.", "Сұлтанмахмұт Торайғыров"),
+        ("Армансыз адам алысқа бармайды.", "Сұлтанмахмұт Торайғыров"),
+        ("Елге қызмет — ерге міндет.", "Сұлтанмахмұт Торайғыров"),
+        ("You have power over your mind, not outside events.", "Marcus Aurelius"),
+        ("The happiness of your life depends upon your thoughts.", "Marcus Aurelius"),
+        ("Waste no more time arguing what a good person should be. Be one.", "Marcus Aurelius"),
+        ("The obstacle is the way.", "Marcus Aurelius"),
+        ("If it is not right, do not do it.", "Marcus Aurelius"),
+        ("He who fears death will never do anything worthy of life.", "Seneca"),
+        ("Luck is what happens when preparation meets opportunity.", "Seneca"),
+        ("Difficulties strengthen the mind.", "Seneca"),
+        ("We suffer more often in imagination than in reality.", "Seneca"),
+        ("No wind is favorable to one who has no destination.", "Seneca"),
+        ("It is not things that disturb us, but our judgments about them.", "Epictetus"),
+        ("First say to yourself what you would be, then do what you have to do.", "Epictetus"),
+        ("No person is free who is not master of himself.", "Epictetus"),
+        ("Do not explain your philosophy. Embody it.", "Epictetus"),
+        ("The key is to keep company only with people who uplift you.", "Epictetus"),
+        ("A journey of a thousand miles begins with a single step.", "Lao Tzu"),
+        ("Knowing others is wisdom; knowing yourself is enlightenment.", "Lao Tzu"),
+        ("Mastering others is strength; mastering yourself is true power.", "Lao Tzu"),
+        ("Nature does not hurry, yet everything is accomplished.", "Lao Tzu"),
+        ("The wise person does not hoard.", "Lao Tzu"),
+        ("It does not matter how slowly you go as long as you do not stop.", "Confucius"),
+        ("Our greatest glory is not in never falling, but in rising every time.", "Confucius"),
+        ("To know what you know and what you do not know, that is knowledge.", "Confucius"),
+        ("The person who moves a mountain begins by carrying small stones.", "Confucius"),
+        ("Study the past if you would define the future.", "Confucius"),
+        ("Knowing yourself is the beginning of all wisdom.", "Aristotle"),
+        ("We are what we repeatedly do.", "Aristotle"),
+        ("Quality is not an act, it is a habit.", "Aristotle"),
+        ("The roots of education are bitter, but the fruit is sweet.", "Aristotle"),
+        ("Patience is bitter, but its fruit is sweet.", "Aristotle"),
+        ("An unexamined life is not worth living.", "Socrates"),
+        ("I know that I know nothing.", "Socrates"),
+        ("The secret of change is to focus energy on building the new.", "Socrates"),
+        ("Strong minds discuss ideas.", "Socrates"),
+        ("To find yourself, think for yourself.", "Socrates"),
+        ("What we think, we become.", "Buddha"),
+        ("Peace comes from within.", "Buddha"),
+        ("No one saves us but ourselves.", "Buddha"),
+        ("The mind is everything.", "Buddha"),
+        ("Drop by drop is the water pot filled.", "Buddha"),
+        ("Genius is one percent inspiration and ninety-nine percent perspiration.", "Thomas Edison"),
+        ("I have not failed. I have found ways that do not work.", "Thomas Edison"),
+        ("Opportunity is missed because it is dressed in overalls.", "Thomas Edison"),
+        ("There is no substitute for hard work.", "Thomas Edison"),
+        ("If we did all we are capable of, we would amaze ourselves.", "Thomas Edison"),
+        ("Life is like riding a bicycle. To keep balance, you must keep moving.", "Albert Einstein"),
+        ("Imagination is more important than knowledge.", "Albert Einstein"),
+        ("In the middle of difficulty lies opportunity.", "Albert Einstein"),
+        ("A person who never made a mistake never tried anything new.", "Albert Einstein"),
+        ("Try not to become successful, but valuable.", "Albert Einstein"),
+    ]
+
+    mood_emojis = ["🧠", "🔥", "🚀", "⚡", "💪", "🌿", "☕", "🛠️", "📚", "✅", "🦅", "🌙", "☀️", "💎", "🧭"]
+
+    current_bucket = int(datetime.now().timestamp() // 120)
+
+    if (
+        "erk_quote_order" not in st.session_state
+        or len(st.session_state.get("erk_quote_order", [])) != len(quotes)
+    ):
+        quote_order = list(range(len(quotes)))
+        random.shuffle(quote_order)
+        st.session_state["erk_quote_order"] = quote_order
+        st.session_state["erk_quote_position"] = 0
+        st.session_state["erk_quote_bucket"] = current_bucket
+
+    if st.session_state.get("erk_quote_bucket") != current_bucket:
+        st.session_state["erk_quote_bucket"] = current_bucket
+        st.session_state["erk_quote_position"] += 1
+
+        if st.session_state["erk_quote_position"] >= len(st.session_state["erk_quote_order"]):
+            quote_order = list(range(len(quotes)))
+            random.shuffle(quote_order)
+            st.session_state["erk_quote_order"] = quote_order
+            st.session_state["erk_quote_position"] = 0
+
+    quote_index = st.session_state["erk_quote_order"][st.session_state["erk_quote_position"]]
+    mood_index = quote_index % len(mood_emojis)
+
+    quote_text, quote_author = quotes[quote_index]
+    quote_of_day = f"{quote_text}<br><span class='erk-live-author'>— {quote_author}</span>"
+    mood_emoji = mood_emojis[mood_index]
+
     if day_type == "Ночная смена":
         emojis = ["🌙", "🛠️", "⚡", "📟", "🔧", "💤"]
-        mascot = "🌙"
-        phrase = "Ночная смена: журнал, заявки, сон — всё под контролем."
+        mascot = mood_emoji
+        phrase = "Ночная смена"
         bg_1 = "rgba(99, 102, 241, 0.16)"
         bg_2 = "rgba(14, 165, 233, 0.12)"
         border_color = "rgba(99, 102, 241, 0.45)"
     elif day_type == "Дневная смена":
         emojis = ["☀️", "🛠️", "⚙️", "📋", "🔌", "✅"]
-        mascot = "☀️"
-        phrase = "Дневная смена: работаем спокойно, фиксируем чётко."
+        mascot = mood_emoji
+        phrase = "Дневная смена"
         bg_1 = "rgba(14, 165, 233, 0.16)"
         bg_2 = "rgba(34, 197, 94, 0.12)"
         border_color = "rgba(14, 165, 233, 0.45)"
     elif day_type == "Отдых":
         emojis = ["🌿", "☕", "🏃", "📚", "💰", "😎"]
-        mascot = "🌿"
-        phrase = "Отдых: восстановление, дела и немного прогресса."
+        mascot = mood_emoji
+        phrase = "Отдых"
         bg_1 = "rgba(34, 197, 94, 0.16)"
         bg_2 = "rgba(250, 204, 21, 0.14)"
         border_color = "rgba(34, 197, 94, 0.45)"
     else:
         emojis = ["📅", "✅", "📝", "💡", "⚙️", "🚀"]
-        mascot = "🚀"
-        phrase = "План дня ещё не задан — настрой его в годовом плане."
+        mascot = mood_emoji
+        phrase = "День не задан"
         bg_1 = "rgba(148, 163, 184, 0.16)"
         bg_2 = "rgba(99, 102, 241, 0.12)"
         border_color = "rgba(100, 116, 139, 0.45)"
@@ -2350,6 +2490,26 @@ def render_live_fun_mode(day_type):
             color: #334155;
             line-height: 1.35;
             font-weight: 600;
+            margin-bottom: 6px;
+        }}
+
+        .erk-live-quote {{
+            font-size: 12.5px;
+            color: #0F172A;
+            line-height: 1.35;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.62);
+            border-radius: 14px;
+            padding: 8px 9px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+        }}
+
+        .erk-live-author {{
+            display: inline-block;
+            margin-top: 5px;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 800;
         }}
 
         @media (max-width: 768px) {{
@@ -2368,6 +2528,9 @@ def render_live_fun_mode(day_type):
             .erk-live-text {{
                 font-size: 12px;
             }}
+            .erk-live-quote {{
+                font-size: 11.5px;
+            }}
         }}
         </style>
 
@@ -2380,7 +2543,8 @@ def render_live_fun_mode(day_type):
                 <div class="erk-live-icon">{mascot}</div>
                 <div class="erk-live-title">Erkoshka Live</div>
             </div>
-            <div class="erk-live-text">{phrase}</div>
+            <div class="erk-live-text"><b>{phrase}</b></div>
+            <div class="erk-live-quote">💬 {quote_of_day}</div>
         </div>
         """,
         unsafe_allow_html=True
@@ -2401,6 +2565,8 @@ def main():
         st.sidebar.success("Supabase подключен ✅")
         live_mode = st.sidebar.toggle("🎬 Живой режим", value=True)
         if live_mode:
+            if st_autorefresh:
+                st_autorefresh(interval=120000, key="quote_refresh")
             render_live_fun_mode(today_plan["day_type"])
     except Exception as error:
         st.error("Ошибка подключения к Supabase")
