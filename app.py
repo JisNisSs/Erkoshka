@@ -2208,158 +2208,182 @@ def render_desktop_app():
 # =============================
 
 def render_live_fun_mode(day_type):
+    """
+    Видимая живая анимация прямо на странице.
+    Не через components iframe, а через st.markdown, чтобы было видно на телефоне и ПК.
+    """
     if day_type == "Ночная смена":
         emojis = ["🌙", "🛠️", "⚡", "📟", "🔧", "💤"]
         mascot = "🌙"
         phrase = "Ночная смена: журнал, заявки, сон — всё под контролем."
-        bg_1 = "rgba(99, 102, 241, 0.14)"
-        bg_2 = "rgba(14, 165, 233, 0.10)"
+        bg_1 = "rgba(99, 102, 241, 0.16)"
+        bg_2 = "rgba(14, 165, 233, 0.12)"
+        border_color = "rgba(99, 102, 241, 0.45)"
     elif day_type == "Дневная смена":
         emojis = ["☀️", "🛠️", "⚙️", "📋", "🔌", "✅"]
         mascot = "☀️"
         phrase = "Дневная смена: работаем спокойно, фиксируем чётко."
-        bg_1 = "rgba(14, 165, 233, 0.14)"
-        bg_2 = "rgba(34, 197, 94, 0.10)"
+        bg_1 = "rgba(14, 165, 233, 0.16)"
+        bg_2 = "rgba(34, 197, 94, 0.12)"
+        border_color = "rgba(14, 165, 233, 0.45)"
     elif day_type == "Отдых":
         emojis = ["🌿", "☕", "🏃", "📚", "💰", "😎"]
         mascot = "🌿"
         phrase = "Отдых: восстановление, дела и немного прогресса."
-        bg_1 = "rgba(34, 197, 94, 0.14)"
-        bg_2 = "rgba(250, 204, 21, 0.10)"
+        bg_1 = "rgba(34, 197, 94, 0.16)"
+        bg_2 = "rgba(250, 204, 21, 0.14)"
+        border_color = "rgba(34, 197, 94, 0.45)"
     else:
         emojis = ["📅", "✅", "📝", "💡", "⚙️", "🚀"]
         mascot = "🚀"
-        phrase = "План дня ещё не задан — можно настроить в годовом плане."
-        bg_1 = "rgba(148, 163, 184, 0.14)"
-        bg_2 = "rgba(99, 102, 241, 0.08)"
+        phrase = "План дня ещё не задан — настрой его в годовом плане."
+        bg_1 = "rgba(148, 163, 184, 0.16)"
+        bg_2 = "rgba(99, 102, 241, 0.12)"
+        border_color = "rgba(100, 116, 139, 0.45)"
+
+    left_positions = [7, 19, 33, 51, 67, 84]
+    delays = [0, 1.5, 3, 0.8, 2.3, 4]
+    durations = [8, 10, 9, 11, 8.5, 10.5]
 
     emoji_html = ""
-    left_positions = [6, 18, 31, 48, 64, 82]
-    delays = [0, 2, 4, 1, 3, 5]
-    durations = [11, 14, 12, 16, 13, 15]
-
     for index, emoji in enumerate(emojis):
         emoji_html += f"""
-        <div class="floating-emoji" style="
+        <div class="erk-floating-emoji" style="
             left:{left_positions[index]}%;
             animation-delay:{delays[index]}s;
             animation-duration:{durations[index]}s;
         ">{emoji}</div>
         """
 
-    components.html(
+    st.markdown(
         f"""
         <style>
-        @keyframes floatEmoji {{
+        @keyframes erkFloatEmoji {{
             0% {{
-                transform: translateY(110vh) rotate(0deg) scale(0.9);
+                transform: translateY(0) rotate(0deg) scale(0.8);
                 opacity: 0;
             }}
-            12% {{ opacity: 0.65; }}
+            10% {{ opacity: 0.85; }}
             50% {{
-                transform: translateY(45vh) rotate(12deg) scale(1.05);
-                opacity: 0.85;
+                transform: translateY(-45vh) rotate(14deg) scale(1.15);
+                opacity: 0.95;
             }}
-            88% {{ opacity: 0.55; }}
+            90% {{ opacity: 0.75; }}
             100% {{
-                transform: translateY(-15vh) rotate(-10deg) scale(0.9);
+                transform: translateY(-92vh) rotate(-12deg) scale(0.85);
                 opacity: 0;
             }}
         }}
 
-        @keyframes mascotBounce {{
+        @keyframes erkMascotBounce {{
             0%, 100% {{ transform: translateY(0) rotate(-2deg); }}
-            50% {{ transform: translateY(-8px) rotate(2deg); }}
+            50% {{ transform: translateY(-9px) rotate(2deg); }}
         }}
 
-        @keyframes cardShine {{
+        @keyframes erkShine {{
             0% {{ background-position: 0% 50%; }}
             50% {{ background-position: 100% 50%; }}
             100% {{ background-position: 0% 50%; }}
         }}
 
-        .floating-emoji {{
+        @keyframes erkPulseRing {{
+            0% {{ box-shadow: 0 0 0 0 {border_color}; }}
+            70% {{ box-shadow: 0 0 0 12px rgba(255, 255, 255, 0); }}
+            100% {{ box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }}
+        }}
+
+        .erk-live-layer {{
             position: fixed;
-            bottom: -80px;
-            font-size: 30px;
-            z-index: 999999;
+            inset: 0;
             pointer-events: none;
-            animation-name: floatEmoji;
+            overflow: hidden;
+            z-index: 999999;
+        }}
+
+        .erk-floating-emoji {{
+            position: absolute;
+            bottom: -60px;
+            font-size: 34px;
+            animation-name: erkFloatEmoji;
             animation-timing-function: linear;
             animation-iteration-count: infinite;
-            filter: drop-shadow(0 8px 10px rgba(15, 23, 42, 0.18));
+            filter: drop-shadow(0 8px 12px rgba(15, 23, 42, 0.22));
         }}
 
-        .fun-mascot {{
+        .erk-live-mascot {{
             position: fixed;
-            right: 18px;
-            bottom: 18px;
-            z-index: 999999;
-            width: 235px;
-            max-width: calc(100vw - 36px);
-            background: linear-gradient(135deg, rgba(255,255,255,0.96), {bg_1}, {bg_2});
-            background-size: 220% 220%;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            border-radius: 22px;
-            padding: 12px 14px;
-            box-shadow: 0 16px 42px rgba(15, 23, 42, 0.18);
-            animation: mascotBounce 3.2s ease-in-out infinite, cardShine 6s ease infinite;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            right: 20px;
+            bottom: 20px;
+            z-index: 1000000;
+            width: 250px;
+            max-width: calc(100vw - 34px);
+            pointer-events: none;
+            background: linear-gradient(135deg, rgba(255,255,255,0.96), {bg_1}, {bg_2}, rgba(255,255,255,0.96));
+            background-size: 240% 240%;
+            border: 2px solid {border_color};
+            border-radius: 24px;
+            padding: 13px 15px;
+            box-shadow: 0 16px 42px rgba(15, 23, 42, 0.20);
+            animation: erkMascotBounce 3s ease-in-out infinite, erkShine 6s ease infinite, erkPulseRing 3.5s ease-out infinite;
         }}
 
-        .fun-mascot-top {{
+        .erk-live-top {{
             display: flex;
             align-items: center;
             gap: 10px;
             margin-bottom: 6px;
         }}
 
-        .fun-mascot-icon {{
-            font-size: 34px;
+        .erk-live-icon {{
+            font-size: 36px;
             line-height: 1;
         }}
 
-        .fun-mascot-title {{
+        .erk-live-title {{
             font-size: 15px;
             font-weight: 900;
             color: #0F172A;
         }}
 
-        .fun-mascot-text {{
+        .erk-live-text {{
             font-size: 13px;
             color: #334155;
             line-height: 1.35;
+            font-weight: 600;
         }}
 
         @media (max-width: 768px) {{
-            .floating-emoji {{
-                font-size: 24px;
+            .erk-floating-emoji {{
+                font-size: 28px;
             }}
-            .fun-mascot {{
+            .erk-live-mascot {{
                 right: 10px;
                 bottom: 10px;
-                width: 210px;
+                width: 215px;
                 padding: 10px 12px;
             }}
-            .fun-mascot-text {{
+            .erk-live-icon {{
+                font-size: 30px;
+            }}
+            .erk-live-text {{
                 font-size: 12px;
             }}
         }}
         </style>
 
-        <div class="emoji-layer">
+        <div class="erk-live-layer">
             {emoji_html}
         </div>
 
-        <div class="fun-mascot">
-            <div class="fun-mascot-top">
-                <div class="fun-mascot-icon">{mascot}</div>
-                <div class="fun-mascot-title">Erkoshka Live</div>
+        <div class="erk-live-mascot">
+            <div class="erk-live-top">
+                <div class="erk-live-icon">{mascot}</div>
+                <div class="erk-live-title">Erkoshka Live</div>
             </div>
-            <div class="fun-mascot-text">{phrase}</div>
+            <div class="erk-live-text">{phrase}</div>
         </div>
         """,
-        height=0
+        unsafe_allow_html=True
     )
 
 
