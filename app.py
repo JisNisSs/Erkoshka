@@ -2626,7 +2626,7 @@ def main():
         live_mode = st.sidebar.toggle("🎬 Живой режим", value=True)
         if live_mode:
             if st_autorefresh:
-                st_autorefresh(interval=10000, key="quote_refresh")
+                st_autorefresh(interval=90000, key="quote_refresh")
             render_live_fun_mode(today_plan["day_type"])
     except Exception as error:
         st.error("Ошибка подключения к Supabase")
