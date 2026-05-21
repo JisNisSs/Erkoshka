@@ -2323,7 +2323,7 @@ def render_live_fun_mode(day_type):
 
     mood_emojis = ["🧠", "🔥", "🚀", "⚡", "💪", "🌿", "☕", "🛠️", "📚", "✅", "🦅", "🌙", "☀️", "💎", "🧭"]
 
-    current_bucket = int(datetime.now().timestamp() // 10)
+    current_bucket = int(datetime.now().timestamp() // 90)
 
     if (
         "erk_quote_order" not in st.session_state
